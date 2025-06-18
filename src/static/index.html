@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Dashboard - Análise de Mercado Profissional</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: rgba(10, 14, 39, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #4f46e5;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .select, .btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .select:hover, .btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #4f46e5;
+        }
+
+        .btn.active {
+            background: #4f46e5;
+            border-color: #4f46e5;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 1rem;
+            padding: 1rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            min-height: calc(100vh - 80px);
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(79, 70, 229, 0.5);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #e2e8f0;
+        }
+
+        .price-display {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .price-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .price-up {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .price-down {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .signal-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .signal-buy {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+        }
+
+        .signal-sell {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        .signal-hold {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
+        .indicator-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .indicator-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .watchlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 0.5rem;
+        }
+
+        .watchlist-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            height: 500px;
+        }
+
+        .chart-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .chart-types {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 400px;
+            font-size: 1.1rem;
+            color: #94a3b8;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(79, 70, 229, 0.3);
+            border-top: 3px solid #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #7c3aed);
+            transition: width 0.5s ease;
+        }
+
+        .signal-reasons {
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        .signal-reasons li {
+            margin-bottom: 0.25rem;
+            list-style: none;
+            position: relative;
+            padding-left: 1rem;
+        }
+
+        .signal-reasons li:before {
+            content: "•";
+            color: #4f46e5;
+            position: absolute;
+            left: 0;
+        }
+
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+            
+            .sidebar {
+                order: 2;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                📈 Market Dashboard
+            </div>
+            <div class="controls">
+                <select id="symbolSelect" class="select">
+                    <option value="">Carregando símbolos...</option>
+                </select>
+                <select id="timeframeSelect" class="select">
+                    <option value="1m">1 Minuto</option>
+                    <option value="5m">5 Minutos</option>
+                    <option value="15m">15 Minutos</option>
+                    <option value="1h">1 Hora</option>
+                    <option value="4h">4 Horas</option>
+                    <option value="1d" selected>1 Dia</option>
+                    <option value="1w">1 Semana</option>
+                </select>
+                <button id="refreshBtn" class="btn">🔄 Atualizar</button>
+                <button id="realtimeBtn" class="btn">▶️ Tempo Real</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <aside class="sidebar">
+            <!-- Quote Card -->
+            <div class="card" id="quoteCard">
+                <div class="card-title">Cotação</div>
+                <div id="quoteContent">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Carregando...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trading Signal Card -->
+            <div class="card" id="signalCard">
+                <div class="card-title">🎯 Sinal de Trading</div>
+                <div id="signalContent">
+                    <div class="loading">Analisando...</div>
+                </div>
+            </div>
+
+            <!-- Technical Indicators Card -->
+            <div class="card" id="indicatorsCard">
+                <div class="card-title">📊 Indicadores Técnicos</div>
+                <div id="indicatorsContent">
+                    <div class="loading">Calculando...</div>
+                </div>
+            </div>
+
+            <!-- Watchlist Card -->
+            <div class="card" id="watchlistCard">
+                <div class="card-title">👁️ Watchlist</div>
+                <div id="watchlistContent">
+                    <div class="loading">Carregando watchlist...</div>
+                </div>
+            </div>
+        </aside>
+
+        <main>
+            <!-- Chart Controls -->
+            <div class="chart-controls">
+                <div class="chart-types">
+                    <button class="btn active" data-type="candlestick">🕯️ Velas</button>
+                    <button class="btn" data-type="line">📈 Linha</button>
+                    <button class="btn" data-type="area">📊 Área</button>
+                </div>
+                <div>
+                    <button id="indicatorsToggle" class="btn">👁️ Indicadores</button>
+                    <button id="drawingTools" class="btn">✏️ Desenhar</button>
+                </div>
+            </div>
+
+            <!-- Chart Container -->
+            <div class="chart-container">
+                <div id="chartContent">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Carregando gráfico...
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let chart = null;
+        let candlestickSeries = null;
+        let lineSeries = null;
+        let areaSeries = null;
+        let volumeSeries = null;
+        let currentSymbol = 'AAPL';
+        let currentTimeframe = '1d';
+        let currentChartType = 'candlestick';
+        let showIndicators = true;
+        let isRealTime = false;
+        let socket = null;
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeChart();
+            loadSymbols();
+            loadWatchlist();
+            setupEventListeners();
+            initializeSocket();
+            loadInitialData();
+        });
+
+        function initializeChart() {
+            const chartContainer = document.getElementById('chartContent');
+            chartContainer.innerHTML = '';
+            
+            chart = LightweightCharts.createChart(chartContainer, {
+                width: chartContainer.clientWidth,
+                height: 400,
+                layout: {
+                    background: { type: 'solid', color: 'transparent' },
+                    textColor: 'rgba(255, 255, 255, 0.9)',
+                },
+                grid: {
+                    vertLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                    horzLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                rightPriceScale: { borderColor: 'rgba(255, 255, 255, 0.2)' },
+                timeScale: { borderColor: 'rgba(255, 255, 255, 0.2)' },
+                watermark: {
+                    visible: true,
+                    fontSize: 24,
+                    horzAlign: 'center',
+                    vertAlign: 'center',
+                    color: 'rgba(255, 255, 255, 0.1)',
+                    text: 'Market Dashboard',
+                },
+            });
+
+            // Add volume series
+            volumeSeries = chart.addHistogramSeries({
+                color: '#26a69a',
+                priceFormat: { type: 'volume' },
+                priceScaleId: '',
+                scaleMargins: { top: 0.8, bottom: 0 },
+            });
+
+            updateChartType();
+        }
+
+        function updateChartType() {
+            // Remove existing price series
+            if (candlestickSeries) {
+                chart.removeSeries(candlestickSeries);
+                candlestickSeries = null;
+            }
+            if (lineSeries) {
+                chart.removeSeries(lineSeries);
+                lineSeries = null;
+            }
+            if (areaSeries) {
+                chart.removeSeries(areaSeries);
+                areaSeries = null;
+            }
+
+            // Add new series based on type
+            if (currentChartType === 'candlestick') {
+                candlestickSeries = chart.addCandlestickSeries({
+                    upColor: '#26a69a',
+                    downColor: '#ef5350',
+                    borderVisible: false,
+                    wickUpColor: '#26a69a',
+                    wickDownColor: '#ef5350',
+                });
+            } else if (currentChartType === 'line') {
+                lineSeries = chart.addLineSeries({
+                    color: '#4f46e5',
+                    lineWidth: 2,
+                });
+            } else if (currentChartType === 'area') {
+                areaSeries = chart.addAreaSeries({
+                    topColor: 'rgba(79, 70, 229, 0.56)',
+                    bottomColor: 'rgba(79, 70, 229, 0.04)',
+                    lineColor: 'rgba(79, 70, 229, 1)',
+                    lineWidth: 2,
+                });
+            }
+        }
+
+        function setupEventListeners() {
+            // Symbol selection
+            document.getElementById('symbolSelect').addEventListener('change', function(e) {
+                currentSymbol = e.target.value;
+                if (currentSymbol) {
+                    loadMarketData();
+                    loadQuote();
+                    loadIndicators();
+                }
+            });
+
+            // Timeframe selection
+            document.getElementById('timeframeSelect').addEventListener('change', function(e) {
+                currentTimeframe = e.target.value;
+                loadMarketData();
+            });
+
+            // Chart type buttons
+            document.querySelectorAll('.chart-types .btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.chart-types .btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentChartType = this.dataset.type;
+                    updateChartType();
+                    loadMarketData(); // Reload data for new chart type
+                });
+            });
+
+            // Refresh button
+            document.getElementById('refreshBtn').addEventListener('click', function() {
+                loadMarketData();
+                loadQuote();
+                loadIndicators();
+                loadWatchlist();
+            });
+
+            // Real-time toggle
+            document.getElementById('realtimeBtn').addEventListener('click', function() {
+                isRealTime = !isRealTime;
+                this.textContent = isRealTime ? '⏸️ Pausar' : '▶️ Tempo Real';
+                this.classList.toggle('active', isRealTime);
+            });
+
+            // Indicators toggle
+            document.getElementById('indicatorsToggle').addEventListener('click', function() {
+                showIndicators = !showIndicators;
+                this.textContent = showIndicators ? '🙈 Ocultar' : '👁️ Indicadores';
+                this.classList.toggle('active', showIndicators);
+            });
+
+            // Window resize
+            window.addEventListener('resize', function() {
+                if (chart) {
+                    const chartContainer = document.getElementById('chartContent');
+                    chart.applyOptions({
+                        width: chartContainer.clientWidth,
+                        height: 400,
+                    });
+                }
+            });
+        }
+
+        function initializeSocket() {
+            socket = io('http://localhost:5000');
+            
+            socket.on('connect', function() {
+                console.log('Connected to server');
+            });
+
+            socket.on('market_update', function(data) {
+                if (data.symbol === currentSymbol && isRealTime) {
+                    updateQuoteDisplay(data.quote);
+                    if (data.marketData) {
+                        updateChartData(data.marketData);
+                    }
+                }
+            });
+        }
+
+        async function loadSymbols() {
+            try {
+                const response = await fetch(`${API_BASE}/market/symbols`);
+                const data = await response.json();
+                
+                const select = document.getElementById('symbolSelect');
+                select.innerHTML = '';
+                
+                Object.entries(data).forEach(([category, items]) => {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = category.toUpperCase();
+                    
+                    items.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.symbol;
+                        option.textContent = `${item.name} (${item.symbol})`;
+                        if (item.symbol === currentSymbol) {
+                            option.selected = true;
+                        }
+                        optgroup.appendChild(option);
+                    });
+                    
+                    select.appendChild(optgroup);
+                });
+            } catch (error) {
+                console.error('Error loading symbols:', error);
+            }
+        }
+
+        async function loadMarketData() {
+            try {
+                const response = await fetch(`${API_BASE}/market/data/${currentSymbol}?interval=${currentTimeframe}&range=1mo`);
+                const data = await response.json();
+                
+                if (data.data && data.data.length > 0) {
+                    updateChartData(data.data);
+                }
+            } catch (error) {
+                console.error('Error loading market data:', error);
+            }
+        }
+
+        function updateChartData(data) {
+            if (!data || data.length === 0) return;
+
+            const chartData = data.map(item => ({
+                time: Math.floor(new Date(item.datetime).getTime() / 1000),
+                open: item.open,
+                high: item.high,
+                low: item.low,
+                close: item.close,
+                value: item.close, // For line/area charts
+            }));
+
+            const volumeData = data.map(item => ({
+                time: Math.floor(new Date(item.datetime).getTime() / 1000),
+                value: item.volume,
+                color: item.close >= item.open ? '#26a69a' : '#ef5350',
+            }));
+
+            // Update price series
+            if (currentChartType === 'candlestick' && candlestickSeries) {
+                candlestickSeries.setData(chartData);
+            } else if (currentChartType === 'line' && lineSeries) {
+                lineSeries.setData(chartData);
+            } else if (currentChartType === 'area' && areaSeries) {
+                areaSeries.setData(chartData);
+            }
+
+            // Update volume
+            if (volumeSeries) {
+                volumeSeries.setData(volumeData);
+            }
+
+            // Fit content
+            chart.timeScale().fitContent();
+        }
+
+        async function loadQuote() {
+            try {
+                const response = await fetch(`${API_BASE}/market/quote/${currentSymbol}`);
+                const data = await response.json();
+                updateQuoteDisplay(data);
+            } catch (error) {
+                console.error('Error loading quote:', error);
+            }
+        }
+
+        function updateQuoteDisplay(quote) {
+            if (!quote) return;
+
+            const content = document.getElementById('quoteContent');
+            const changeClass = quote.change >= 0 ? 'price-up' : 'price-down';
+            const changeIcon = quote.change >= 0 ? '📈' : '📉';
+            
+            content.innerHTML = `
+                <div class="price-display">$${quote.price.toFixed(4)}</div>
+                <div class="price-change ${changeClass}">
+                    ${changeIcon} ${quote.change >= 0 ? '+' : ''}${quote.change.toFixed(4)} (${quote.changePercent.toFixed(2)}%)
+                </div>
+                <div class="indicator-grid" style="margin-top: 1rem;">
+                    <div class="indicator-item">
+                        <span>Máxima:</span>
+                        <span>$${quote.dayHigh.toFixed(4)}</span>
+                    </div>
+                    <div class="indicator-item">
+                        <span>Mínima:</span>
+                        <span>$${quote.dayLow.toFixed(4)}</span>
+                    </div>
+                    <div class="indicator-item">
+                        <span>Volume:</span>
+                        <span>${(quote.volume / 1000000).toFixed(1)}M</span>
+                    </div>
+                    <div class="indicator-item">
+                        <span>Fech. Ant.:</span>
+                        <span>$${quote.previousClose.toFixed(4)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadIndicators() {
+            try {
+                const response = await fetch(`${API_BASE}/analysis/indicators/${currentSymbol}`);
+                const data = await response.json();
+                
+                updateIndicatorsDisplay(data.indicators);
+                updateSignalDisplay(data.signal);
+            } catch (error) {
+                console.error('Error loading indicators:', error);
+            }
+        }
+
+        function updateIndicatorsDisplay(indicators) {
+            if (!indicators) return;
+
+            const content = document.getElementById('indicatorsContent');
+            let html = '<div class="indicator-grid">';
+
+            if (indicators.rsi) {
+                const rsiColor = indicators.rsi > 70 ? '#ef4444' : indicators.rsi < 30 ? '#22c55e' : '#f59e0b';
+                html += `
+                    <div class="indicator-item">
+                        <span>RSI (14):</span>
+                        <span style="color: ${rsiColor}">${indicators.rsi.toFixed(1)}</span>
+                    </div>
+                `;
+            }
+
+            if (indicators.macd && indicators.macd.macd) {
+                html += `
+                    <div class="indicator-item">
+                        <span>MACD:</span>
+                        <span>${indicators.macd.macd.toFixed(4)}</span>
+                    </div>
+                `;
+            }
+
+            if (indicators.sma_20) {
+                html += `
+                    <div class="indicator-item">
+                        <span>SMA (20):</span>
+                        <span>$${indicators.sma_20.toFixed(4)}</span>
+                    </div>
+                `;
+            }
+
+            if (indicators.sma_50) {
+                html += `
+                    <div class="indicator-item">
+                        <span>SMA (50):</span>
+                        <span>$${indicators.sma_50.toFixed(4)}</span>
+                    </div>
+                `;
+            }
+
+            if (indicators.stochastic && indicators.stochastic.k) {
+                html += `
+                    <div class="indicator-item">
+                        <span>Stoch %K:</span>
+                        <span>${indicators.stochastic.k.toFixed(1)}</span>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+
+            if (indicators.bollinger) {
+                html += `
+                    <div style="margin-top: 1rem;">
+                        <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem;">Bollinger Bands:</div>
+                        <div class="indicator-grid">
+                            <div class="indicator-item">
+                                <span>Superior:</span>
+                                <span>$${indicators.bollinger.upper.toFixed(4)}</span>
+                            </div>
+                            <div class="indicator-item">
+                                <span>Inferior:</span>
+                                <span>$${indicators.bollinger.lower.toFixed(4)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            content.innerHTML = html;
+        }
+
+        function updateSignalDisplay(signal) {
+            if (!signal) return;
+
+            const content = document.getElementById('signalContent');
+            let signalClass = 'signal-hold';
+            let signalText = 'AGUARDAR';
+            let signalIcon = '⏸️';
+
+            if (signal.recommendation === 'STRONG_BUY' || signal.recommendation === 'BUY') {
+                signalClass = 'signal-buy';
+                signalText = signal.recommendation === 'STRONG_BUY' ? 'COMPRA FORTE' : 'COMPRA';
+                signalIcon = '🚀';
+            } else if (signal.recommendation === 'STRONG_SELL' || signal.recommendation === 'SELL') {
+                signalClass = 'signal-sell';
+                signalText = signal.recommendation === 'STRONG_SELL' ? 'VENDA FORTE' : 'VENDA';
+                signalIcon = '📉';
+            }
+
+            content.innerHTML = `
+                <div class="signal-badge ${signalClass}">
+                    ${signalIcon} ${signalText}
+                </div>
+                <div style="margin-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span>Confiança:</span>
+                        <span style="font-weight: 600;">${(signal.confidence * 100).toFixed(0)}%</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: ${signal.confidence * 100}%"></div>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem;">Força: ${signal.strength}</div>
+                    <div style="font-size: 0.8rem; color: #94a3b8;">Score: ${signal.score}</div>
+                </div>
+                ${signal.signals && signal.signals.length > 0 ? `
+                    <div class="signal-reasons">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Razões:</div>
+                        <ul>
+                            ${signal.signals.slice(0, 3).map(reason => `<li>${reason}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        async function loadWatchlist() {
+            try {
+                const response = await fetch(`${API_BASE}/market/watchlist`);
+                const data = await response.json();
+                
+                const content = document.getElementById('watchlistContent');
+                content.innerHTML = data.map(item => `
+                    <div class="watchlist-item" onclick="selectSymbol('${item.symbol}')">
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">${item.symbol}</div>
+                            <div style="font-size: 0.8rem; color: #94a3b8;">$${item.price.toFixed(4)}</div>
+                        </div>
+                        <div class="price-change ${item.changePercent >= 0 ? 'price-up' : 'price-down'}">
+                            ${item.changePercent >= 0 ? '+' : ''}${item.changePercent.toFixed(2)}%
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading watchlist:', error);
+            }
+        }
+
+        function selectSymbol(symbol) {
+            currentSymbol = symbol;
+            document.getElementById('symbolSelect').value = symbol;
+            loadMarketData();
+            loadQuote();
+            loadIndicators();
+        }
+
+        function loadInitialData() {
+            loadMarketData();
+            loadQuote();
+            loadIndicators();
+        }
+
+        // Auto-refresh every 30 seconds when real-time is enabled
+        setInterval(() => {
+            if (isRealTime) {
+                loadQuote();
+                loadIndicators();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
+
